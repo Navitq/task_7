@@ -7,7 +7,13 @@ import Nav from 'react-bootstrap/Nav';
 export default function StoragePageLinks(props) {
 
    async function logOut(){
-      props.changeHeader(false)
+      let resp = await fetch("/log_out",{
+         method:"delete"
+      })
+      let mess = await resp.json()
+      if(mess.auth === false){
+         props.changeHeader(mess.auth)
+      }
       
       
    }
@@ -15,7 +21,7 @@ export default function StoragePageLinks(props) {
    return (
       <>
          <Nav.Item>
-            <NavLink to="/admin"  className="nav-link">Chat</NavLink>
+            <NavLink to="/chat"  className="nav-link">Chat</NavLink>
          </Nav.Item>
          <Nav.Item>
             <div style={{cursor:"pointer"}} className="nav-link" onClick={logOut}>Log Out</div>

@@ -1,0 +1,17 @@
+.scroll-block::-webkit-scrollbar-track {border-radius: 4px;}
+.scroll-block::-webkit-scrollbar {width: 6px;}
+.scroll-block::-webkit-scrollbar-thumb {border-radius: 4px;background: #f0f2f5;}
+.scroll-block:hover::-webkit-scrollbar-thumb {background: #6a7d9b;}
+
+.cht-area__inter-ms {
+    border-top-right-radius: 7px;
+    border-bottom-right-radius: 7px;
+    border-top-left-radius: 20px;
+    border-bottom-left-radius: 20px;
+    padding: 7px;
+    border-style: solid;
+    border-width: 1px;
+    margin-right: 0px;
+    display: flex;
+    flex-direction: column;
+}

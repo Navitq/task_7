@@ -4,7 +4,7 @@ import MainPage from './components/MainPage'
 
 function App() {
     return (
-        <Container >
+        <Container   style={{height:"100%"}}>
             <MainPage></MainPage>
         </Container>
 );

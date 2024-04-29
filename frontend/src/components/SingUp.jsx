@@ -24,7 +24,6 @@ export default function SignUpList(props) {
                     method: "post",
                     body: formDataReg,
                 });
-				console.log(response)
 
                 let message = await response.json();
 				e.target.closest("form").reset()

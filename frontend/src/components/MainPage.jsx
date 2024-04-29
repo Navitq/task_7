@@ -14,7 +14,7 @@ function MainPage() {
 
 
     return (
-        <Container >
+        <Container style={{height:"100%", display: "flex", flexDirection: "column"}}>
             <BrowserRouter>
                 <Header
                     headerState={headerState}

@@ -7,20 +7,20 @@ const bodyParser = require("body-parser");
 const { Server } = require("socket.io");
 const { createServer } = require("http");
 const cookieParser = require("cookie-parser");
+const { emit } = require("process");
 
 const app = express();
+const middlware = session({
+    resave: false,
+    saveUninitialized: false,
+    secret: "secretPsswrd",
+});
 
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 app.use(cookieParser("secretPsswrd"));
 
-app.use(
-    session({
-        resave: false,
-        saveUninitialized: false,
-        secret: "secretPsswrd",
-    })
-);
+app.use(middlware);
 
 const server = createServer(app);
 
@@ -29,14 +29,14 @@ app.get("/sign_up", formidable(), async (req, res) => {
         res.json({ auth: true });
         return;
     }
-})
+});
 
 app.get("/sign_in", formidable(), async (req, res) => {
     if (req.session.auth) {
         res.json({ auth: true });
         return;
     }
-})
+});
 
 app.post("/sign_in", formidable(), async (req, res) => {
     if (req.session.auth) {
@@ -71,7 +71,7 @@ app.post("/sign_up", formidable(), async (req, res) => {
 
     try {
         const result = await db.query(
-            `SELECT * from clientslist WHERE phone='${req.fields.phone}'`
+            `SELECT * from clientslist WHERE phone='${req.fields.phone}' or email='${req.fields.email}'`
         );
         if (result.rowCount >= 1) {
             res.json({ auth: "This user is already registered" });
@@ -82,11 +82,27 @@ app.post("/sign_up", formidable(), async (req, res) => {
         es.status(500).send("Internal Server Error");
     }
     try {
-        const result = await db.query(
-            `INSERT INTO clientslist(email, userName, password, phone, img , lastVisit) VALUES ('${req.fields.email}','${req.fields.name}','${req.fields.password}','${req.fields.phone}','${req.fields.img}','${(new Date()).toLocaleDateString('ru-RU', {year: 'numeric',month: '2-digit',day: '2-digit'})}')`
+        await db.query(
+            `INSERT INTO clientslist(email, userName, password, phone, img , lastVisit) VALUES ('${
+                req.fields.email
+            }','${req.fields.name}','${req.fields.password}','${
+                req.fields.phone
+            }','${req.fields.img}','${new Date().toLocaleDateString("ru-RU", {
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+            })}')`
         );
         req.session.auth = true;
-        req.session.email = req.fields.phone;
+        req.session.phone = req.fields.phone;
+
+        const clientId = await db.query(
+            `SELECT user_id, username, img from clientslist WHERE phone='${req.session.phone}'`
+        );
+
+        await db.query(
+            `INSERT INTO chats(first_user) VALUES ('${clientId.rows[0].user_id}')`
+        );
     } catch (err) {
         console.error(err);
         res.status(500).send("Internal Server Error");
@@ -96,10 +112,11 @@ app.post("/sign_up", formidable(), async (req, res) => {
     return;
 });
 
-app.delete('/log_out', async (req, res) => { 
+app.delete("/log_out", async (req, res) => {
     delete req.session.auth;
     req.session.destroy();
-})
+    res.json({ auth: false });
+});
 
 const io = new Server(server, {
     maxHttpBufferSize: 5e7,
@@ -109,7 +126,90 @@ const io = new Server(server, {
     },
 });
 
+io.engine.use(middlware);
+
 io.on("connect", (socket) => {
+    const req = socket.request;
+
+    socket.on("get_dialogs", async () => {
+        if (!req.session.auth) {
+            return;
+        }
+
+        try {
+            const clientId = await db.query(
+                `SELECT user_id, username, img, phone from clientslist WHERE phone='${req.session.phone}'`
+            );
+            req.session.uuid = clientId.rows[0].user_id;
+
+            const clientChats = await db.query(
+                `SELECT * from chats WHERE first_user='${req.session.uuid}' or second_user='${req.session.uuid}'`
+            );
+
+            let data = await Promise.all( 
+                clientChats.rows.map(async (el) => {
+                let friendName, lastMessage;
+                lastMessage = await db.query(
+                    `SELECT message from messages WHERE chat_id='${el.chat_id}'`
+                );
+                if (el.second_user != req.session.uuid && el.second_user != null) {
+                    friendName = await db.query(
+                        `SELECT username, img, phone, user_id from clientslist WHERE user_id='${el.second_user}'`
+                    );
+                } else if (el.first_user != req.session.uuid  && el.second_user != null) {
+                    friendName = await db.query(
+                        `SELECT username, img, phone, user_id from clientslist WHERE user_id='${el.first_user}'`
+                    );
+                } else {
+                    friendName =  clientId.rows[0];
+                }
+                friendName.message =
+                    lastMessage.rows[lastMessage.rows.length - 1]?.message;
+                return await friendName;
+            }))
+            socket.emit("got_dialogs", JSON.stringify(data));
+        } catch (err) {
+            console.error(err);
+            es.status(500).send("Internal Server Error");
+        }
+    });
+
+    socket.on("get_favs", async () => {
+        if (!req.session.auth) {
+            return;
+        }
+        const clientId = await db.query(
+            `SELECT username, img, user_id from clientslist where phone='${req.session.phone}'`
+        );
+
+        req.session.uuid = clientId.rows[0].user_id;
+        const clientChats = await db.query(
+            `SELECT chat_id from chats WHERE first_user='${req.session.uuid}' and (second_user is null)`
+        );
+        const messages = await db.query(
+            `SELECT message, uuid, sender_id from messages WHERE chat_id='${clientChats.rows[0].chat_id}'`
+        );
+        let data = [...clientId.rows, messages.rows, clientChats.rows[0]]
+        socket.emit("got_favs", JSON.stringify(data));
+    })
+
+
+    socket.on("get_contacts", async () => {
+        if (!req.session.auth) {
+            return;
+        }
+
+        try {
+            const clientId = await db.query(
+                `SELECT username, img, phone from clientslist where phone!='${req.session.phone}'`
+            );
+            socket.emit("got_contacts", JSON.stringify(clientId.rows));
+        } catch (err) {
+            console.error(err);
+            es.status(500).send("Internal Server Error");
+        }
+    });
+
     socket.on("get_chats", () => {});
 
     socket.on("get_messages", () => {});
@@ -120,10 +220,6 @@ io.on("connect", (socket) => {
 
     socket.on("send_message", () => {});
 });
-
-
-
-
 
 server.listen(4000, async (req, res) => {
     try {
@@ -142,13 +238,12 @@ server.listen(4000, async (req, res) => {
             password varchar not null
          )
         `);
-
         await db.query(`
         CREATE TABLE IF NOT EXISTS chats(
             id SERIAL PRIMARY KEY,
             chat_id UUID DEFAULT Uuid_generate_v4 (),
             first_user varchar not null,
-            second_user varchar not null,
+            second_user varchar,
             createdate  TIMESTAMPTZ
         )
         `);
@@ -156,6 +251,8 @@ server.listen(4000, async (req, res) => {
         await db.query(`
         CREATE TABLE IF NOT EXISTS messages(
             id SERIAL PRIMARY KEY,
+            uuid UUID DEFAULT Uuid_generate_v4 (),
+            sender_id varchar not null,
             chat_id varchar not null,
             message varchar ,
             file_id varchar ,
