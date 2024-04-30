@@ -29,6 +29,8 @@ app.get("/sign_up", formidable(), async (req, res) => {
         res.json({ auth: true });
         return;
     }
+    res.json({ auth: false });
+    return;
 });
 
 app.get("/sign_in", formidable(), async (req, res) => {
@@ -36,6 +38,9 @@ app.get("/sign_in", formidable(), async (req, res) => {
         res.json({ auth: true });
         return;
     }
+    res.json({ auth: false });
+    return;
+
 });
 
 app.post("/sign_in", formidable(), async (req, res) => {
@@ -125,17 +130,18 @@ const io = new Server(server, {
         methods: ["GET", "POST"],
     },
 });
-
+let localSocket = null;
 io.engine.use(middlware);
 
 io.on("connect", (socket) => {
     const req = socket.request;
-
-    socket.on("get_dialogs", async () => {
+    
+    console.log(11111)
+    socket.on("get_dialogs", async (data) => {
         if (!req.session.auth) {
             return;
         }
-
+        
         try {
             const clientId = await db.query(
                 `SELECT user_id, username, img, phone from clientslist WHERE phone='${req.session.phone}'`
@@ -174,6 +180,34 @@ io.on("connect", (socket) => {
         }
     });
 
+    socket.on("send_message", async (data)=>{
+        if(!data[3]){
+            await db.query(
+                `INSERT INTO messages(sender_id, chat_id, message) values ('${data[0]}', '${data[1]}', '${data[2]}');`
+            );
+            return
+        } else if(data[1]){
+            await db.query(
+                `INSERT INTO chats(first_user, second_user) values ('${data[0]}', '${data[4]}');`
+            );
+            let chatId = await db.query(
+                `select chat_id from chats where first_user='${data[0]}' and second_user='${data[4]}'`
+            );
+            await db.query(
+                `INSERT INTO messages(sender_id, chat_id, message) values ('${data[0]}', '${chatId}', '${data[2]}');`
+            );
+        } else {
+            let chatId = await db.query(
+                `select chat_id from chats where (first_user='${data[0]}' and second_user='${data[4]}') or (first_user='${data[4]}' and second_user='${data[0]}')`
+            );
+            await db.query(
+                `INSERT INTO messages(sender_id, chat_id, message) values ('${data[0]}', '${chatId}', '${data[2]}');`
+            );
+        }
+
+
+    })
+
     socket.on("get_favs", async () => {
         if (!req.session.auth) {
             return;
@@ -184,13 +218,13 @@ io.on("connect", (socket) => {
 
         req.session.uuid = clientId.rows[0].user_id;
         const clientChats = await db.query(
-            `SELECT chat_id from chats WHERE first_user='${req.session.uuid}' and (second_user is null)`
+            `SELECT chat_id, second_user from chats WHERE first_user='${req.session.uuid}' and (second_user is null)`
         );
         const messages = await db.query(
             `SELECT message, uuid, sender_id from messages WHERE chat_id='${clientChats.rows[0].chat_id}'`
         );
         let data = [...clientId.rows, messages.rows, clientChats.rows[0]]
-        socket.emit("got_favs", JSON.stringify(data));
+        //socket.emit("got_favs", JSON.stringify(data));
     })
 
 
@@ -201,7 +235,7 @@ io.on("connect", (socket) => {
 
         try {
             const clientId = await db.query(
-                `SELECT username, img, phone from clientslist where phone!='${req.session.phone}'`
+                `SELECT username, img, phone, user_id from clientslist where phone!='${req.session.phone}'`
             );
             socket.emit("got_contacts", JSON.stringify(clientId.rows));
         } catch (err) {
@@ -209,6 +243,33 @@ io.on("connect", (socket) => {
             es.status(500).send("Internal Server Error");
         }
     });
+
+    socket.on("get_user_data",async (dataJSON)=>{
+        if (!req.session.auth) {
+            return;
+        }
+
+        let dataParsed = JSON.parse(dataJSON);
+        const clientId = await db.query(
+            `SELECT username, img, user_id from clientslist where user_id='${dataParsed[0]}'`
+        );
+        let clientChats = await db.query(
+            `SELECT chat_id, second_user from chats WHERE (first_user='${dataParsed[0]}' and second_user='${dataParsed[1]}') or (second_user='${dataParsed[0]}' and first_user='${dataParsed[1]}')`
+        );
+        if(clientChats.rows.length<1){
+            await db.query(
+                `INSERT INTO chats(first_user, second_user) values ('${dataParsed[0]}', '${dataParsed[1]}');`
+            );
+            clientChats = await db.query(
+                `select chat_id from chats where first_user='${dataParsed[0]}' and second_user='${dataParsed[1]}'`
+            );
+        }
+        const messages = await db.query(
+            `SELECT message, uuid, sender_id from messages WHERE chat_id='${clientChats.rows[0].chat_id}'`
+        );
+        let data = [...clientId.rows, messages.rows, clientChats.rows[0]]
+        socket.emit("got_user_data", JSON.stringify(data));
+    })
 
     socket.on("get_chats", () => {});
 
@@ -218,7 +279,6 @@ io.on("connect", (socket) => {
 
     socket.on("delete_message", () => {});
 
-    socket.on("send_message", () => {});
 });
 
 server.listen(4000, async (req, res) => {
@@ -238,6 +298,7 @@ server.listen(4000, async (req, res) => {
             password varchar not null
          )
         `);
+
         await db.query(`
         CREATE TABLE IF NOT EXISTS chats(
             id SERIAL PRIMARY KEY,

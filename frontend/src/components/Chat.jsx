@@ -6,29 +6,30 @@ import io from "socket.io-client";
 import Image from "react-bootstrap/Image";
 import Card from "react-bootstrap/Card";
 import { v4 as uuidv4 } from "uuid";
+import { socket } from "./socket";
 
 import Dialogs from "./Dialogs";
 import ChatArea from "./ChatArea";
+import AllCards from "./AllCards";
+
 import "./css/scroll.css";
 
 let mainUser = null;
 let mainUserId = null;
-
 
 function Chat() {
     let [dialogs, setDialogs] = useState("You don't have dialogs now...");
     let [contacts, setContacts] = useState("Loading...");
     let [person, setPerson] = useState("Loading...");
 
-    let socket = useRef(io());
-
     useEffect(() => {
-        socket.current.on("connect", () => {
-            socket.current.emit("get_dialogs");
-            socket.current.emit("get_favs");
-            socket.current.emit("get_contacts");
+        socket.once("connect", () => {
+            console.log(1111111);
+            socket.emit("get_dialogs");
+            socket.emit("get_favs");
+            socket.emit("get_contacts");
 
-            socket.current.on("got_favs", (dataJSON) => {
+            socket.on("got_favs", (dataJSON) => {
                 let data = JSON.parse(dataJSON);
                 console.log(data);
                 mainUser = data[0].username;
@@ -36,10 +37,10 @@ function Chat() {
                 let cards = data[1]?.map((el) => {
                     return (
                         <Container
-                            data-chat-id = {data[2].chat_id}
+                            data-chat-id={data[2].chat_id}
                             data-message-id={el.uuid}
                             data-sender-id={el.sender_id}
-                            data-user = {mainUserId}
+                            data-user={mainUserId}
                             key={uuidv4()}
                             className="d-flex flex-direction-column cht-area__inter-ms my-2 mt-0"
                             style={{
@@ -71,13 +72,13 @@ function Chat() {
                     cards,
                     username: data[0].username,
                     chatId: data[2].chat_id,
-                    user : mainUserId,
+                    user: mainUserId,
                     img: data[0].img,
                 };
                 setPerson(fullData);
             });
 
-            socket.current.on("got_dialogs", (dataJSON) => {
+            socket.on("got_dialogs", (dataJSON) => {
                 let data = JSON.parse(dataJSON);
                 let cards = data.map((el) => {
                     return (
@@ -128,7 +129,8 @@ function Chat() {
                 });
                 setDialogs(cards);
             });
-            socket.current.on("got_contacts", (dataJSON) => {
+
+            socket.on("got_contacts", (dataJSON) => {
                 let data = JSON.parse(dataJSON);
                 let cards = data.map((el) => {
                     return (
@@ -136,6 +138,8 @@ function Chat() {
                             key={uuidv4()}
                             className="mt-3"
                             data-phone={`${el.phone}`}
+                            data-user-id={`${el.user_id}`}
+                            onClick={newContactChat}
                         >
                             <Card.Body>
                                 <Card.Title className="d-flex">
@@ -177,14 +181,44 @@ function Chat() {
                 });
                 setContacts(cards);
             });
-        });
+
+            socket.on("got_user_data", (dataJSON) => {
+                console.log(11111111111111);
+
+                let data = JSON.parse(dataJSON);
+                let cards = (
+                    <AllCards data={data} mainUserId={mainUserId}></AllCards>
+                );
+                setPerson((prev) => {
+                    let newObj = {
+                        username: data[0].username,
+                        chatId: data[2].chat_id,
+                        user: mainUserId,
+                        img: data[0].img,
+                    };
+                    return newObj;
+                });
+            });
+        })
+        socket.connect()
+        return ()=>{
+            console.log(55555)
+            socket.close()
+        }
     }, []);
+
+    function newContactChat(e) {
+        socket.emit(
+            "get_user_data",
+            JSON.stringify([e.currentTarget.dataset.userId, mainUserId])
+        );
+    }
 
     function newMessage(message) {
         let card = (
             <Container
                 key={uuidv4()}
-                data-sender = {mainUserId}
+                data-sender={mainUserId}
                 className="d-flex flex-direction-column cht-area__inter-ms my-2 mt-0"
                 style={{
                     maxWidth: "70%",
@@ -203,9 +237,8 @@ function Chat() {
         );
 
         setPerson((prev) => {
-            let newObj = {}; // новый пустой объект
+            let newObj = {};
 
-            // давайте скопируем все свойства user в него
             for (let key in prev) {
                 newObj[key] = prev[key];
             }
@@ -235,7 +268,7 @@ function Chat() {
                 <Row style={{ flexGrow: 1 }}>
                     <ChatArea
                         newMessage={newMessage}
-                        socket={socket.current}
+                        socket={socket}
                         person={person}
                     ></ChatArea>
                 </Row>

@@ -13,20 +13,15 @@ function ChatArea(props) {
         }
 
         let senderId = props.newMessage(messageRef.current.value);
-        props.socket.emit("send_message", [senderId, messageRef.current.dataset.chatId, message]);
+        //props.socket.emit("send_message", [senderId, chatInfo.current.dataset.chatId, messageRef.current.value]);
         messageRef.current.value = ""
 
     }
 
-    useEffect(()=>{
-        props.socket.on("connect", ()=>{
-
-        })
-    },[])
 
     return (
         <Container className="d-flex flex-column ml-5" style={{ height: "100%" }}>
-            <Container ref={chatInfo} className="d-flex" data-chat-id={props.person.chatId} data-user={props.person.user}>
+            <Container ref={chatInfo} className="d-flex" data-second-user={props.person.second_user} data-chat-id={props.person.chatId} data-user={props.person.user}>
                 <Container className="d-flex">
                     <Container className="pl-0 pr-0" style={{width:"fit-content"}}>
                         <Image src={props.person.img} height="45px" roundedCircle/>
