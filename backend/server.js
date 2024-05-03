@@ -136,7 +136,6 @@ io.engine.use(middlware);
 io.on("connect", (socket) => {
     const req = socket.request;
     
-    console.log(11111)
     socket.on("get_dialogs", async (data) => {
         if (!req.session.auth) {
             return;
@@ -147,31 +146,35 @@ io.on("connect", (socket) => {
                 `SELECT user_id, username, img, phone from clientslist WHERE phone='${req.session.phone}'`
             );
             req.session.uuid = clientId.rows[0].user_id;
-
             const clientChats = await db.query(
                 `SELECT * from chats WHERE first_user='${req.session.uuid}' or second_user='${req.session.uuid}'`
             );
 
             let data = await Promise.all( 
                 clientChats.rows.map(async (el) => {
-                let friendName, lastMessage;
+                let friendName = {}, lastMessage;
+
                 lastMessage = await db.query(
                     `SELECT message from messages WHERE chat_id='${el.chat_id}'`
                 );
-                if (el.second_user != req.session.uuid && el.second_user != null) {
+                if (el.second_user != req.session.uuid && typeof(el.second_user) != typeof({}) && el.second_user != "null" && el.second_user != "undefined") {
                     friendName = await db.query(
                         `SELECT username, img, phone, user_id from clientslist WHERE user_id='${el.second_user}'`
                     );
-                } else if (el.first_user != req.session.uuid  && el.second_user != null) {
+                    friendName = friendName.rows[0]
+
+                } else if (el.first_user != req.session.uuid  && typeof(el.first_user) != typeof({}) && el.first_user != "null" && el.first_user != "undefined") {
                     friendName = await db.query(
                         `SELECT username, img, phone, user_id from clientslist WHERE user_id='${el.first_user}'`
                     );
+                    friendName = friendName.rows[0]
                 } else {
                     friendName =  clientId.rows[0];
                 }
-                friendName.message =
-                    lastMessage.rows[lastMessage.rows.length - 1]?.message;
-                return await friendName;
+
+                friendName.message = lastMessage.rows[lastMessage.rows.length - 1]?.message;
+
+                return friendName;
             }))
             socket.emit("got_dialogs", JSON.stringify(data));
         } catch (err) {
@@ -186,7 +189,7 @@ io.on("connect", (socket) => {
                 `INSERT INTO messages(sender_id, chat_id, message) values ('${data[0]}', '${data[1]}', '${data[2]}');`
             );
             return
-        } else if(data[1]){
+        } else if(!data[1]){
             await db.query(
                 `INSERT INTO chats(first_user, second_user) values ('${data[0]}', '${data[4]}');`
             );
@@ -196,17 +199,34 @@ io.on("connect", (socket) => {
             await db.query(
                 `INSERT INTO messages(sender_id, chat_id, message) values ('${data[0]}', '${chatId}', '${data[2]}');`
             );
+            let messId = await db.query(
+                `select uuid, chat_id from messages where sender_id='${data[0]}' and chat_id='${data[1]}' and message =chat_id='${data[2]}'`
+            );
+            data.push(messId.rows[0])
+
         } else {
-            let chatId = await db.query(
-                `select chat_id from chats where (first_user='${data[0]}' and second_user='${data[4]}') or (first_user='${data[4]}' and second_user='${data[0]}')`
-            );
             await db.query(
-                `INSERT INTO messages(sender_id, chat_id, message) values ('${data[0]}', '${chatId}', '${data[2]}');`
+                `INSERT INTO messages(sender_id, chat_id, message) values ('${data[0]}', '${data[1]}', '${data[2]}');`
             );
+
+            let messId = await db.query(
+                `select uuid, chat_id from messages where sender_id='${data[0]}' and chat_id='${data[1]}' and message='${data[2]}'`
+            );
+            data.push(messId.rows[0])
+
+        }
+        if(data[3]){
+            let userName = await db.query(
+                `select username from clientslist where user_id='${data[0]}'`
+            );
+            data[4].username = userName.rows[0].username;
+            socket.broadcast.emit(data[3], JSON.stringify(data));
+            console.log(data,1111111111)
         }
 
-
     })
+
+    
 
     socket.on("get_favs", async () => {
         if (!req.session.auth) {
@@ -224,7 +244,7 @@ io.on("connect", (socket) => {
             `SELECT message, uuid, sender_id from messages WHERE chat_id='${clientChats.rows[0].chat_id}'`
         );
         let data = [...clientId.rows, messages.rows, clientChats.rows[0]]
-        //socket.emit("got_favs", JSON.stringify(data));
+        socket.emit("got_favs", JSON.stringify(data));
     })
 
 
@@ -254,20 +274,33 @@ io.on("connect", (socket) => {
             `SELECT username, img, user_id from clientslist where user_id='${dataParsed[0]}'`
         );
         let clientChats = await db.query(
-            `SELECT chat_id, second_user from chats WHERE (first_user='${dataParsed[0]}' and second_user='${dataParsed[1]}') or (second_user='${dataParsed[0]}' and first_user='${dataParsed[1]}')`
+            `SELECT chat_id, second_user, first_user  from chats WHERE (first_user='${dataParsed[0]}' and second_user='${dataParsed[1]}') or (second_user='${dataParsed[0]}' and first_user='${dataParsed[1]}')`
         );
         if(clientChats.rows.length<1){
             await db.query(
                 `INSERT INTO chats(first_user, second_user) values ('${dataParsed[0]}', '${dataParsed[1]}');`
             );
             clientChats = await db.query(
-                `select chat_id from chats where first_user='${dataParsed[0]}' and second_user='${dataParsed[1]}'`
+                `select chat_id, first_user, second_user  from chats where first_user='${dataParsed[0]}' and second_user='${dataParsed[1]}'`
             );
+        } else {
+            
+            if(clientId.rows[0].user_id == clientChats.rows[0].first_user){
+
+            } else if(clientId.rows[0].user_id == clientChats.rows[0].second_user){
+                clientChats.rows[0].second_user = clientChats.rows[0].first_user;
+                clientChats.rows[0].first_user = clientId.rows[0].user_id;
+            }
         }
         const messages = await db.query(
             `SELECT message, uuid, sender_id from messages WHERE chat_id='${clientChats.rows[0].chat_id}'`
         );
-        let data = [...clientId.rows, messages.rows, clientChats.rows[0]]
+        const user = await db.query(
+            `SELECT username, img, user_id from clientslist where user_id='${dataParsed[1]}'`
+        );
+
+        
+        let data = [...clientId.rows, messages.rows, clientChats.rows[0], ...user.rows]
         socket.emit("got_user_data", JSON.stringify(data));
     })
 

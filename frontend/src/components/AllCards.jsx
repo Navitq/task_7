@@ -4,6 +4,7 @@ import { Container } from "react-bootstrap";
 import Image from "react-bootstrap/Image";
 
 function AllCards(props) {
+    console.log(props.data)
     let cards = props.data[1].map((el) => {
         if (el.sender_id == props.mainUserId) {
             return (
@@ -20,7 +21,7 @@ function AllCards(props) {
                         width: "fit-content",
                     }}
                 >
-                    <p className="h5">{props.data[0].username}</p>
+                    <p className="h5">{props.mainUser}</p>
                     <p
                         style={{
                             marginBottom: "3px",
@@ -53,7 +54,7 @@ function AllCards(props) {
                         width: "fit-content",
                     }}
                 >
-                    <p className="h5">{props.data[0].username}</p>
+                    <p className="h5">{props.data[3].username}</p>
                     <p
                         style={{
                             marginBottom: "3px",

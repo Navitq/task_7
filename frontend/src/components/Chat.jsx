@@ -13,6 +13,8 @@ import ChatArea from "./ChatArea";
 import AllCards from "./AllCards";
 
 import "./css/scroll.css";
+import DialogCard from "./DialogCard";
+import OuterMessage from "./OuterMessage"
 
 let mainUser = null;
 let mainUserId = null;
@@ -24,14 +26,12 @@ function Chat() {
 
     useEffect(() => {
         socket.once("connect", () => {
-            console.log(1111111);
             socket.emit("get_dialogs");
             socket.emit("get_favs");
             socket.emit("get_contacts");
 
             socket.on("got_favs", (dataJSON) => {
                 let data = JSON.parse(dataJSON);
-                console.log(data);
                 mainUser = data[0].username;
                 mainUserId = data[0].user_id;
                 let cards = data[1]?.map((el) => {
@@ -76,55 +76,36 @@ function Chat() {
                     img: data[0].img,
                 };
                 setPerson(fullData);
+
+                socket.on(mainUserId, (JSONdata) => {  
+                    let data = JSON.parse(JSONdata);
+                    let active = document.getElementById("act-chat").dataset.secondUser;
+                    if(active == data[0]){
+                        console.log(data)
+                        let card = <OuterMessage key={uuidv4()} data={data} mainUser={mainUser} mainUserId={mainUserId}></OuterMessage>
+                        setPerson((prev) => {
+                            let newObj = {};
+                
+                            for (let key in prev) {
+                                newObj[key] = prev[key];
+                            }
+                            if(newObj.cards){
+                                newObj.cards.push(card);
+                            } else {
+                                newObj.cards = [card];
+                            }
+                            
+                            return newObj;
+                        });
+                    }
+                });
             });
 
             socket.on("got_dialogs", (dataJSON) => {
                 let data = JSON.parse(dataJSON);
                 let cards = data.map((el) => {
                     return (
-                        <Card
-                            key={uuidv4()}
-                            className="mt-3"
-                            data-phone={`${el.phone}`}
-                            data-uuid={`${el.user_id}`}
-                        >
-                            <Card.Body>
-                                <Card.Title className="d-flex">
-                                    <Container
-                                        style={{
-                                            textAlign: "left",
-                                            paddingLeft: "0px",
-                                            paddingRight: "0px",
-                                        }}
-                                        className="d-flex align-items-center"
-                                    >
-                                        {el.username}
-                                    </Container>
-                                    <Container
-                                        style={{
-                                            width: "fit-content",
-                                            paddingRight: "0px",
-                                        }}
-                                    >
-                                        <Image
-                                            src={`${el.img}`}
-                                            roundedCircle
-                                            height="36px"
-                                        />
-                                    </Container>
-                                </Card.Title>
-                                <Card.Text
-                                    style={{
-                                        maxHeight: "75px",
-                                        overflow: "auto",
-                                    }}
-                                    className="scroll-block"
-                                >
-                                    {el.message ||
-                                        "Find new friends! Start chatting!"}
-                                </Card.Text>
-                            </Card.Body>
-                        </Card>
+                        <DialogCard el={el} key={uuidv4()}></DialogCard>
                     );
                 });
                 setDialogs(cards);
@@ -183,26 +164,30 @@ function Chat() {
             });
 
             socket.on("got_user_data", (dataJSON) => {
-                console.log(11111111111111);
 
                 let data = JSON.parse(dataJSON);
-                let cards = (
-                    <AllCards data={data} mainUserId={mainUserId}></AllCards>
-                );
+                console.log(data)
+                let cards = <AllCards key={uuidv4()} data={data} mainUser={mainUser} mainUserId={mainUserId}></AllCards>;
+                
                 setPerson((prev) => {
                     let newObj = {
-                        username: data[0].username,
+                        username: data[3].username,
                         chatId: data[2].chat_id,
                         user: mainUserId,
-                        img: data[0].img,
+                        second_user: data[2].second_user,
+                        img: data[3].img,
+                        cards: [cards]
                     };
                     return newObj;
                 });
+                console.log(person)
             });
+
+        
+        
         })
         socket.connect()
         return ()=>{
-            console.log(55555)
             socket.close()
         }
     }, []);
@@ -210,7 +195,7 @@ function Chat() {
     function newContactChat(e) {
         socket.emit(
             "get_user_data",
-            JSON.stringify([e.currentTarget.dataset.userId, mainUserId])
+            JSON.stringify([mainUserId,e.currentTarget.dataset.userId])
         );
     }
 
@@ -242,11 +227,17 @@ function Chat() {
             for (let key in prev) {
                 newObj[key] = prev[key];
             }
-            newObj.cards.push(card);
+            if(newObj.cards){
+                newObj.cards.push(card);
+            } else {
+                newObj.cards = [card];
+            }
+            
             return newObj;
         });
         return mainUserId;
     }
+    
     return (
         <Container
             style={{
@@ -270,6 +261,7 @@ function Chat() {
                         newMessage={newMessage}
                         socket={socket}
                         person={person}
+                        mainUserId = {mainUserId}
                     ></ChatArea>
                 </Row>
             </Col>
