@@ -98,6 +98,7 @@ function Chat() {
                             return newObj;
                         });
                     }
+                    socket.emit("get_dialogs");
                 });
             });
 
@@ -105,7 +106,7 @@ function Chat() {
                 let data = JSON.parse(dataJSON);
                 let cards = data.map((el) => {
                     return (
-                        <DialogCard el={el} key={uuidv4()}></DialogCard>
+                        <DialogCard el={el} newContactChat={newContactChat} key={uuidv4()}></DialogCard>
                     );
                 });
                 setDialogs(cards);
@@ -120,6 +121,7 @@ function Chat() {
                             className="mt-3"
                             data-phone={`${el.phone}`}
                             data-user-id={`${el.user_id}`}
+                            data-uuid={`${el.user_id}`}
                             onClick={newContactChat}
                         >
                             <Card.Body>
@@ -195,7 +197,7 @@ function Chat() {
     function newContactChat(e) {
         socket.emit(
             "get_user_data",
-            JSON.stringify([mainUserId,e.currentTarget.dataset.userId])
+            JSON.stringify([mainUserId, e.currentTarget.dataset.uuid])
         );
     }
 
@@ -219,7 +221,9 @@ function Chat() {
                     <Image src="./img/pencil.svg" roundedCircle height="19px" />
                 </Container>
             </Container>
+            
         );
+        socket.emit("get_dialogs");
 
         setPerson((prev) => {
             let newObj = {};

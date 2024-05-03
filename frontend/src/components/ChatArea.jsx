@@ -14,6 +14,8 @@ function ChatArea(props) {
         let senderId = props.newMessage(messageRef.current.value);
         props.socket.emit("send_message", [senderId, chatInfo.current.dataset.chatId, messageRef.current.value, chatInfo.current.dataset.secondUser]);
         messageRef.current.value = ""
+        props.socket.emit("get_dialogs");
+
     }
 
 

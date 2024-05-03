@@ -12,6 +12,7 @@ function DialogCard(props) {
             className="mt-3"
             data-phone={`${props.el.phone}`}
             data-uuid={`${props.el.user_id}`}
+            onClick={props.newContactChat}
         >
             <Card.Body>
                 <Card.Title className="d-flex">

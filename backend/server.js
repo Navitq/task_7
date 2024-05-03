@@ -270,6 +270,9 @@ io.on("connect", (socket) => {
         }
 
         let dataParsed = JSON.parse(dataJSON);
+        if(dataParsed[0] == dataParsed[1]){
+            return;
+        }
         const clientId = await db.query(
             `SELECT username, img, user_id from clientslist where user_id='${dataParsed[0]}'`
         );
@@ -295,6 +298,8 @@ io.on("connect", (socket) => {
         const messages = await db.query(
             `SELECT message, uuid, sender_id from messages WHERE chat_id='${clientChats.rows[0].chat_id}'`
         );
+        console.log(dataParsed[1])
+
         const user = await db.query(
             `SELECT username, img, user_id from clientslist where user_id='${dataParsed[1]}'`
         );
