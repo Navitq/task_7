@@ -10,9 +10,7 @@ function AllCards(props) {
             e.currentTarget.closest(".flex-direction-column").dataset.messageId
         );
     }
-    console.log(props.data,11111111);
     let cards = props.data[1].map((el) => {
-        console.log(typeof el.file_id, el.file_id, !el.file_id);
         if (el.sender_id == props.mainUserId && !el.file_id) {
             return (
                 <Container

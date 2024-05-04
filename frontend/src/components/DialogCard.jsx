@@ -6,6 +6,7 @@ import { Container } from "react-bootstrap";
 
 
 function DialogCard(props) {
+    console.log(props.el)
     return (
         <Card
             key={uuidv4()}
@@ -42,7 +43,7 @@ function DialogCard(props) {
                     }}
                     className="scroll-block"
                 >
-                    {props.el.message || "Find new friends! Start chatting!"}
+                    {props.el.message || props.el.file_name ||"Find new friends! Start chatting!"}
                 </Card.Text>
             </Card.Body>
         </Card>

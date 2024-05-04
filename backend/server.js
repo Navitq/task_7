@@ -156,7 +156,7 @@ io.on("connect", (socket) => {
                         lastMessage;
 
                     lastMessage = await db.query(
-                        `SELECT message from messages WHERE chat_id='${el.chat_id}'`
+                        `SELECT message, file_name from messages WHERE chat_id='${el.chat_id}'`
                     );
                     if (
                         el.second_user != req.session.uuid &&
@@ -184,6 +184,10 @@ io.on("connect", (socket) => {
 
                     friendName.message =
                         lastMessage.rows[lastMessage.rows.length - 1]?.message;
+                    friendName.file_name =
+                        lastMessage.rows[
+                            lastMessage.rows.length - 1
+                        ]?.file_name;
 
                     return friendName;
                 })
@@ -225,7 +229,7 @@ io.on("connect", (socket) => {
             data.push(messId.rows[0]);
         }
         writeFile(`./files/${data[2]}`, mainFile, (err) => {
-            console.log(err)
+            console.log(err);
         });
 
         if (data[3]) {
@@ -289,7 +293,7 @@ io.on("connect", (socket) => {
             `SELECT chat_id, second_user from chats WHERE first_user='${req.session.uuid}' and (second_user is null)`
         );
         const messages = await db.query(
-            `SELECT message, uuid, sender_id from messages WHERE chat_id='${clientChats.rows[0].chat_id}'`
+            `SELECT message, uuid, sender_id, file_id, file_name from messages WHERE chat_id='${clientChats.rows[0].chat_id}'`
         );
         let data = [...clientId.rows, messages.rows, clientChats.rows[0]];
         socket.emit("got_favs", JSON.stringify(data));
@@ -318,6 +322,25 @@ io.on("connect", (socket) => {
 
         let dataParsed = JSON.parse(dataJSON);
         if (dataParsed[0] == dataParsed[1]) {
+            const clientId = await db.query(
+                `SELECT username, img, user_id from clientslist where user_id='${dataParsed[0]}'`
+            );
+
+            let clientChats = await db.query(
+                `SELECT chat_id, second_user, first_user  from chats WHERE (first_user='${dataParsed[0]}' and second_user is null)`
+            );
+
+            const messages = await db.query(
+                `SELECT message, uuid, sender_id, file_id, file_name  from messages WHERE chat_id='${clientChats.rows[0].chat_id}'`
+            );
+
+            let data = [
+                ...clientId.rows,
+                messages.rows,
+                clientChats.rows[0],
+                ...clientId.rows,
+            ];
+            socket.emit("got_user_data", JSON.stringify(data));
             return;
         }
         const clientId = await db.query(
@@ -367,15 +390,14 @@ io.on("connect", (socket) => {
         let messages = await db.query(
             `SELECT file_name from messages WHERE file_id='${data[0]}'`
         );
-        readFile(`./files/${data[0]}`,(err,file)=>{
-            if(err){
-                console.error(err)
+        readFile(`./files/${data[0]}`, (err, file) => {
+            if (err) {
+                console.error(err);
                 return;
             }
-            socket.emit("got_file",file, messages.rows[0].file_name)
-        })
+            socket.emit("got_file", file, messages.rows[0].file_name);
+        });
     });
-
 
     socket.on("get_messages", () => {});
 

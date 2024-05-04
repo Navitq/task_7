@@ -37,36 +37,13 @@ function Chat() {
                 mainUserId = data[0].user_id;
                 let cards = data[1]?.map((el) => {
                     return (
-                        <Container
-                            data-chat-id={data[2].chat_id}
-                            data-message-id={el.uuid}
-                            data-sender-id={el.sender_id}
-                            data-user={mainUserId}
-                            key={uuidv4()}
-                            className="d-flex flex-direction-column cht-area__inter-ms my-2 mt-0"
-                            style={{
-                                maxWidth: "70%",
-                                minWidth: "20%",
-                                width: "fit-content",
-                            }}
-                        >
-                            <p className="h5">{data[0].username}</p>
-                            <p
-                                style={{
-                                    marginBottom: "3px",
-                                    textAlign: "left",
-                                }}
-                            >
-                                {el.message}
-                            </p>
-                            <Container className="pl-0 pr-0 d-flex justify-content-end">
-                                <Image
-                                    src="./img/pencil.svg"
-                                    roundedCircle
-                                    height="19px"
-                                />
-                            </Container>
-                        </Container>
+                        <AllCards
+                        getFile={getFile}
+                        key={uuidv4()}
+                        data={data}
+                        mainUser={mainUser}
+                        mainUserId={mainUserId}
+                    ></AllCards>
                     );
                 });
                 let fullData = {
@@ -83,7 +60,6 @@ function Chat() {
                     let active =
                         document.getElementById("act-chat").dataset.secondUser;
                     if (active == data[0]) {
-                        console.log(data);
                         let card = (
                             <OuterMessage
                                 key={uuidv4()}
@@ -116,7 +92,6 @@ function Chat() {
                         document.getElementById("act-chat").dataset.secondUser;
 
                     if (active == data[0]) {
-                        console.log(2222222222222);
                         let card = (
                             <OuterMessageFile
                                 key={uuidv4()}
@@ -214,7 +189,6 @@ function Chat() {
 
             socket.on("got_user_data", (dataJSON) => {
                 let data = JSON.parse(dataJSON);
-                console.log(data);
                 let cards = (
                     <AllCards
                         getFile={getFile}
@@ -236,12 +210,10 @@ function Chat() {
                     };
                     return newObj;
                 });
-                console.log(person);
             });
 
             socket.on("got_file", (file, name) => {
                 let link = document.createElement("a");
-                console.log(name)
                 link.download = `${name}`;
                 link.href = window.URL.createObjectURL(new Blob([file]));
                 link.click();
@@ -255,7 +227,6 @@ function Chat() {
     }, []);
 
     function getFile(messageId) {
-        console.log(messageId)
         socket.emit("get_file", [messageId]);
     }
 
@@ -271,7 +242,6 @@ function Chat() {
                 file={file}
             ></InnerFileMessage>
         );
-        console.log(file);
         setPerson((prev) => {
             let newObj = {};
 
@@ -286,7 +256,7 @@ function Chat() {
 
             return newObj;
         });
-        // socket.emit("get_dialogs");
+        // 
 
         return messageId;
     }
@@ -319,6 +289,7 @@ function Chat() {
                 </Container>
             </Container>
         );
+
         socket.emit("get_dialogs");
 
         setPerson((prev) => {

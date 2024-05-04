@@ -8,28 +8,35 @@ function ChatArea(props) {
     let chatInfo = useRef(null);
     let fileRef = useRef(null);
 
-    function addFile(){
+    function addFile() {
         fileRef.current.click();
     }
 
-    function sendMessage() {
-        let senderId = props.newMessage(messageRef.current.value);
+    function sendMessage(e) {
+        let senderId = props.mainUserId;
 
-        if(fileRef.current.files[0]){
+        if (fileRef.current.files[0]) {
             let uuid = props.sendFile(fileRef.current.files[0]);
-            props.socket.emit("send_file", [
-            senderId,
-            chatInfo.current.dataset.chatId,
-            uuid,
-            chatInfo.current.dataset.secondUser,
-            fileRef.current.files[0].name
-            ],
-            fileRef.current.files[0]
-        );
+            props.socket.emit(
+                "send_file",
+                [
+                    senderId,
+                    chatInfo.current.dataset.chatId,
+                    uuid,
+                    chatInfo.current.dataset.secondUser,
+                    fileRef.current.files[0].name,
+                ],
+                fileRef.current.files[0]
+            );
         }
+        fileRef.current.value = "";
+
         if (messageRef.current.value == "") {
+            props.socket.emit("get_dialogs");
+
             return;
         }
+        senderId = props.newMessage(messageRef.current.value);
         props.socket.emit("send_message", [
             senderId,
             chatInfo.current.dataset.chatId,
@@ -38,6 +45,7 @@ function ChatArea(props) {
         ]);
         messageRef.current.value = "";
         props.socket.emit("get_dialogs");
+        
     }
 
     return (
@@ -104,8 +112,16 @@ function ChatArea(props) {
                     className="d-flex"
                     style={{ paddingLeft: "0px", width: "fit-content" }}
                 >
-                    <Form.Control type="file" ref={fileRef}  style={{display:"none"}}/>
-                    <Image height="34px" src="./img/clip.svg" onClick={addFile}/>
+                    <Form.Control
+                        type="file"
+                        ref={fileRef}
+                        style={{ display: "none" }}
+                    />
+                    <Image
+                        height="34px"
+                        src="./img/clip.svg"
+                        onClick={addFile}
+                    />
                     <Image
                         height="34px"
                         src="./img/send.svg"
