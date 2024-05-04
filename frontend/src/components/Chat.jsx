@@ -6,15 +6,16 @@ import io from "socket.io-client";
 import Image from "react-bootstrap/Image";
 import Card from "react-bootstrap/Card";
 import { v4 as uuidv4 } from "uuid";
-import { socket } from "./socket";
 
+import { socket } from "./socket";
+import "./css/scroll.css";
 import Dialogs from "./Dialogs";
 import ChatArea from "./ChatArea";
 import AllCards from "./AllCards";
-
-import "./css/scroll.css";
 import DialogCard from "./DialogCard";
-import OuterMessage from "./OuterMessage"
+import OuterMessage from "./OuterMessage";
+import OuterMessageFile from "./OuterMessageFile";
+import InnerFileMessage from "./InnerFileMessage";
 
 let mainUser = null;
 let mainUserId = null;
@@ -77,24 +78,66 @@ function Chat() {
                 };
                 setPerson(fullData);
 
-                socket.on(mainUserId, (JSONdata) => {  
+                socket.on(mainUserId, (JSONdata) => {
                     let data = JSON.parse(JSONdata);
-                    let active = document.getElementById("act-chat").dataset.secondUser;
-                    if(active == data[0]){
-                        console.log(data)
-                        let card = <OuterMessage key={uuidv4()} data={data} mainUser={mainUser} mainUserId={mainUserId}></OuterMessage>
+                    let active =
+                        document.getElementById("act-chat").dataset.secondUser;
+                    if (active == data[0]) {
+                        console.log(data);
+                        let card = (
+                            <OuterMessage
+                                key={uuidv4()}
+                                data={data}
+                                mainUser={mainUser}
+                                mainUserId={mainUserId}
+                            ></OuterMessage>
+                        );
                         setPerson((prev) => {
                             let newObj = {};
-                
+
                             for (let key in prev) {
                                 newObj[key] = prev[key];
                             }
-                            if(newObj.cards){
+                            if (newObj.cards) {
                                 newObj.cards.push(card);
                             } else {
                                 newObj.cards = [card];
                             }
-                            
+
+                            return newObj;
+                        });
+                    }
+                    socket.emit("get_dialogs");
+                });
+
+                socket.on(`${mainUserId}_file`, (JSONdata) => {
+                    let data = JSON.parse(JSONdata);
+                    let active =
+                        document.getElementById("act-chat").dataset.secondUser;
+
+                    if (active == data[0]) {
+                        console.log(2222222222222);
+                        let card = (
+                            <OuterMessageFile
+                                key={uuidv4()}
+                                data={data}
+                                mainUser={mainUser}
+                                mainUserId={mainUserId}
+                                getFile={getFile}
+                            ></OuterMessageFile>
+                        );
+                        setPerson((prev) => {
+                            let newObj = {};
+
+                            for (let key in prev) {
+                                newObj[key] = prev[key];
+                            }
+                            if (newObj.cards) {
+                                newObj.cards.push(card);
+                            } else {
+                                newObj.cards = [card];
+                            }
+
                             return newObj;
                         });
                     }
@@ -106,7 +149,11 @@ function Chat() {
                 let data = JSON.parse(dataJSON);
                 let cards = data.map((el) => {
                     return (
-                        <DialogCard el={el} newContactChat={newContactChat} key={uuidv4()}></DialogCard>
+                        <DialogCard
+                            el={el}
+                            newContactChat={newContactChat}
+                            key={uuidv4()}
+                        ></DialogCard>
                     );
                 });
                 setDialogs(cards);
@@ -166,11 +213,18 @@ function Chat() {
             });
 
             socket.on("got_user_data", (dataJSON) => {
-
                 let data = JSON.parse(dataJSON);
-                console.log(data)
-                let cards = <AllCards key={uuidv4()} data={data} mainUser={mainUser} mainUserId={mainUserId}></AllCards>;
-                
+                console.log(data);
+                let cards = (
+                    <AllCards
+                        getFile={getFile}
+                        key={uuidv4()}
+                        data={data}
+                        mainUser={mainUser}
+                        mainUserId={mainUserId}
+                    ></AllCards>
+                );
+
                 setPerson((prev) => {
                     let newObj = {
                         username: data[3].username,
@@ -178,21 +232,64 @@ function Chat() {
                         user: mainUserId,
                         second_user: data[2].second_user,
                         img: data[3].img,
-                        cards: [cards]
+                        cards: [cards],
                     };
                     return newObj;
                 });
-                console.log(person)
+                console.log(person);
             });
 
-        
-        
-        })
-        socket.connect()
-        return ()=>{
-            socket.close()
-        }
+            socket.on("got_file", (file, name) => {
+                let link = document.createElement("a");
+                console.log(name)
+                link.download = `${name}`;
+                link.href = window.URL.createObjectURL(new Blob([file]));
+                link.click();
+                window.URL.revokeObjectURL(link.href);
+            });
+        });
+        socket.connect();
+        return () => {
+            socket.close();
+        };
     }, []);
+
+    function getFile(messageId) {
+        console.log(messageId)
+        socket.emit("get_file", [messageId]);
+    }
+
+    function sendFile(file) {
+        let messageId = uuidv4();
+        let card = (
+            <InnerFileMessage
+                getFile={getFile}
+                key={uuidv4()}
+                messageId={messageId}
+                mainUser={mainUser}
+                mainUserId={mainUserId}
+                file={file}
+            ></InnerFileMessage>
+        );
+        console.log(file);
+        setPerson((prev) => {
+            let newObj = {};
+
+            for (let key in prev) {
+                newObj[key] = prev[key];
+            }
+            if (newObj.cards) {
+                newObj.cards.push(card);
+            } else {
+                newObj.cards = [card];
+            }
+
+            return newObj;
+        });
+        // socket.emit("get_dialogs");
+
+        return messageId;
+    }
 
     function newContactChat(e) {
         socket.emit(
@@ -221,7 +318,6 @@ function Chat() {
                     <Image src="./img/pencil.svg" roundedCircle height="19px" />
                 </Container>
             </Container>
-            
         );
         socket.emit("get_dialogs");
 
@@ -231,17 +327,17 @@ function Chat() {
             for (let key in prev) {
                 newObj[key] = prev[key];
             }
-            if(newObj.cards){
+            if (newObj.cards) {
                 newObj.cards.push(card);
             } else {
                 newObj.cards = [card];
             }
-            
+
             return newObj;
         });
         return mainUserId;
     }
-    
+
     return (
         <Container
             style={{
@@ -263,9 +359,10 @@ function Chat() {
                 <Row style={{ flexGrow: 1 }}>
                     <ChatArea
                         newMessage={newMessage}
+                        sendFile={sendFile}
                         socket={socket}
                         person={person}
-                        mainUserId = {mainUserId}
+                        mainUserId={mainUserId}
                     ></ChatArea>
                 </Row>
             </Col>
