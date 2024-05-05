@@ -16,6 +16,7 @@ import DialogCard from "./DialogCard";
 import OuterMessage from "./OuterMessage";
 import OuterMessageFile from "./OuterMessageFile";
 import InnerFileMessage from "./InnerFileMessage";
+import Webrtc from "./Webrtc";
 
 let mainUser = null;
 let mainUserId = null;
@@ -31,6 +32,7 @@ function Chat() {
             socket.emit("get_favs");
             socket.emit("get_contacts");
 
+
             socket.on("got_favs", (dataJSON) => {
                 let data = JSON.parse(dataJSON);
                 mainUser = data[0].username;
@@ -38,12 +40,12 @@ function Chat() {
                 let cards = data[1]?.map((el) => {
                     return (
                         <AllCards
-                        getFile={getFile}
-                        key={uuidv4()}
-                        data={data}
-                        mainUser={mainUser}
-                        mainUserId={mainUserId}
-                    ></AllCards>
+                            getFile={getFile}
+                            key={uuidv4()}
+                            data={data}
+                            mainUser={mainUser}
+                            mainUserId={mainUserId}
+                        ></AllCards>
                     );
                 });
                 let fullData = {
@@ -54,6 +56,8 @@ function Chat() {
                     img: data[0].img,
                 };
                 setPerson(fullData);
+                socket.emit("me");
+
 
                 socket.on(mainUserId, (JSONdata) => {
                     let data = JSON.parse(JSONdata);
@@ -256,7 +260,7 @@ function Chat() {
 
             return newObj;
         });
-        // 
+        //
 
         return messageId;
     }
@@ -310,34 +314,43 @@ function Chat() {
     }
 
     return (
-        <Container
-            style={{
-                padding: "20px",
-                borderStyle: "solid",
-                borderWidth: "1px",
-                borderRadius: "15px",
-                height: "100%",
-            }}
-        >
-            <Col className="d-flex" sm="12" style={{ height: "100%" }}>
-                <Row className="mr-4">
-                    <Dialogs
-                        dialogs={dialogs}
-                        contacts={contacts}
-                        style={{ flexGrow: 1 }}
-                    ></Dialogs>
-                </Row>
-                <Row style={{ flexGrow: 1 }}>
-                    <ChatArea
-                        newMessage={newMessage}
-                        sendFile={sendFile}
-                        socket={socket}
-                        person={person}
-                        mainUserId={mainUserId}
-                    ></ChatArea>
-                </Row>
-            </Col>
-        </Container>
+        <>
+            <Container
+                style={{
+                    padding: "20px",
+                    borderStyle: "solid",
+                    borderWidth: "1px",
+                    borderRadius: "15px",
+                    height: "100%",
+                }}
+            >
+                <Col className="d-flex" sm="12" style={{ height: "100%" }}>
+                    <Row className="mr-4">
+                        <Dialogs
+                            dialogs={dialogs}
+                            contacts={contacts}
+                            style={{ flexGrow: 1 }}
+                        ></Dialogs>
+                    </Row>
+                    <Row style={{ flexGrow: 1 }}>
+                        <ChatArea
+                            newMessage={newMessage}
+                            sendFile={sendFile}
+                            socket={socket}
+                            person={person}
+                            mainUserId={mainUserId}
+                        ></ChatArea>
+                    </Row>
+                </Col>
+            </Container>
+            <Container>
+                <Webrtc
+                    socket={socket}
+                    mainUserId={mainUserId}
+                    mainUser={mainUser}
+                ></Webrtc>
+            </Container>
+        </>
     );
 }
 

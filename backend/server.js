@@ -198,6 +198,10 @@ io.on("connect", (socket) => {
             es.status(500).send("Internal Server Error");
         }
     });
+    
+    socket.on("me", () => {
+        socket.emit("me",socket.id)
+    });
 
     socket.on("send_file", async (data, mainFile) => {
         if (!data[3]) {
@@ -399,7 +403,17 @@ io.on("connect", (socket) => {
         });
     });
 
-    socket.on("get_messages", () => {});
+    socket.on("call_user", (data) => {
+        console.log(socket.id)
+        io.to(data.userToCall).emit("call_user", {
+            signal: data.signalData,
+            from: data.from,
+            name: data.name
+        })
+    });
+    socket.on("answer_call", (data) => {
+        io.to(data.to).emit("call_accepted", data.signal)
+    });
 
     socket.on("change_message", () => {});
 
